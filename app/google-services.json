@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "779410819445",
+    "project_id": "trafficprediction-cc889",
+    "storage_bucket": "trafficprediction-cc889.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:779410819445:android:1bb4983705981fffbd6b3c",
+        "android_client_info": {
+          "package_name": "com.example.trafficprediction"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDX5ufdyITMRSWSunNqaYbmJxTr0VwiJHk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
