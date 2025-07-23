@@ -1,6 +1,6 @@
 package com.example.trafficprediction.network
 
-// BuildConfig import'unu KALDIRDIK
+// We've REMOVED the BuildConfig import.
 // import com.example.trafficprediction.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -8,71 +8,71 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-// Ağ isteklerini loglamak için interceptor (Debug build'ler için)
-// BuildConfig kullanamadığımız için loglamayı manuel olarak kontrol edebiliriz
-// veya şimdilik her zaman açık bırakabiliriz.
+// Interceptor for logging network requests (intended for Debug builds).
+// Since we can't use BuildConfig, we can control logging manually
+// or leave it always on for now.
 private val loggingInterceptor = HttpLoggingInterceptor().apply {
     // level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
-    // BuildConfig olmadığı için şimdilik hep loglasın (veya NONE yapabilirsiniz)
+    // As BuildConfig is not available, let's always log for now (or we can set it to NONE).
     level = HttpLoggingInterceptor.Level.BODY
 }
 
-// OkHttpClient (Timeout ve loglama ayarları)
+// OkHttpClient with timeout and logging settings.
 private val okHttpClient = OkHttpClient.Builder()
     .addInterceptor(loggingInterceptor)
-    .connectTimeout(30, TimeUnit.SECONDS) // Bağlantı zaman aşımı
-    .readTimeout(30, TimeUnit.SECONDS)    // Okuma zaman aşımı
+    .connectTimeout(30, TimeUnit.SECONDS) // Connection timeout.
+    .readTimeout(30, TimeUnit.SECONDS)    // Read timeout.
     .build()
 
 
-// --- Bizim Cloud Function İçin Retrofit Instance ---
+// --- Retrofit Instance for Our Cloud Function ---
 object TrafficApiInstance {
-    // Cloud Function URL'niz (Değişmedi)
+    // Our Cloud Function URL (unchanged).
     private const val BASE_URL = "https://get-traffic-prediction-ghuf2bsaaq-uc.a.run.app/"
 
 
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient) // OkHttpClient'ı kullan
+            .client(okHttpClient) // We use the configured OkHttpClient.
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
-    // Bu kısım değişmedi
+    // This part remains unchanged.
     val api: TrafficApiService by lazy {
         retrofit.create(TrafficApiService::class.java)
     }
 }
 
-// --- Google Geocoding API İçin Retrofit Instance ---
+// --- Retrofit Instance for Google Geocoding API ---
 object GeocodingApiInstance {
-    // Google API Base URL (Değişmedi)
+    // Google API Base URL (unchanged).
     private const val BASE_URL = "https://maps.googleapis.com/"
 
 
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient) // OkHttpClient'ı kullan
+            .client(okHttpClient) // We use the configured OkHttpClient.
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
-    // Bu kısım değişmedi
+    // This part remains unchanged.
     val api: GeocodingApiService by lazy {
         retrofit.create(GeocodingApiService::class.java)
     }
 }
 
-// --- OpenWeatherMap API İçin Retrofit Instance ---
+// --- Retrofit Instance for OpenWeatherMap API ---
 object WeatherApiInstance {
     private const val BASE_URL = "https://api.openweathermap.org/"
 
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
-            .client(okHttpClient) // Aynı OkHttpClient'ı kullanabiliriz
+            .client(okHttpClient) // We can use the same OkHttpClient.
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

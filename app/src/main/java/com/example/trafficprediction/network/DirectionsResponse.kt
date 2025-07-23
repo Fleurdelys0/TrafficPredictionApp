@@ -8,7 +8,7 @@ data class DirectionsResponse(
     @SerializedName("routes")
     val routes: List<Route>?,
     @SerializedName("status")
-    val status: String? // OK, NOT_FOUND, ZERO_RESULTS, MAX_WAYPOINTS_EXCEEDED, INVALID_REQUEST, OVER_QUERY_LIMIT, REQUEST_DENIED, UNKNOWN_ERROR
+    val status: String? // Possible values: OK, NOT_FOUND, ZERO_RESULTS, MAX_WAYPOINTS_EXCEEDED, INVALID_REQUEST, OVER_QUERY_LIMIT, REQUEST_DENIED, UNKNOWN_ERROR
 )
 
 data class GeocodedWaypoint(
@@ -41,9 +41,9 @@ data class Leg(
     @SerializedName("distance")
     val distance: Distance?,
     @SerializedName("duration")
-    val duration: Duration?, // Trafiksiz normal süre
+    val duration: Duration?, // Normal duration without traffic.
     @SerializedName("duration_in_traffic")
-    val durationInTraffic: Duration?, // Trafik yoğunluğuna göre tahmin edilen süre
+    val durationInTraffic: Duration?, // Estimated duration considering traffic conditions.
     @SerializedName("end_address")
     val endAddress: String?,
     @SerializedName("end_location")
@@ -55,26 +55,26 @@ data class Leg(
     @SerializedName("steps")
     val steps: List<Step>?,
     @SerializedName("traffic_speed_entry")
-    val trafficSpeedEntry: List<Any>?, // Detaylı trafik bilgisi, şimdilik Any
+    val trafficSpeedEntry: List<Any>?, // Detailed traffic information, using Any for now.
     @SerializedName("via_waypoint")
     val viaWaypoint: List<Any>?
 )
 
 data class Distance(
     @SerializedName("text")
-    val text: String?, // örn: "10.5 km"
+    val text: String?, // e.g., "10.5 km"
     @SerializedName("value")
-    val value: Int? // metre cinsinden
+    val value: Int? // Value in meters.
 )
 
 data class Duration(
     @SerializedName("text")
-    val text: String?, // örn: "35 mins"
+    val text: String?, // e.g., "35 mins"
     @SerializedName("value")
-    val value: Int? // saniye cinsinden
+    val value: Int? // Value in seconds.
 )
 
-data class LocationDetails( // GeocodingResponse.Location ile çakışmaması için farklı isim
+data class LocationDetails( // Named differently to avoid conflict with GeocodingResponse.Location.
     @SerializedName("lat")
     val lat: Double?,
     @SerializedName("lng")
@@ -95,7 +95,7 @@ data class Step(
     @SerializedName("start_location")
     val startLocation: LocationDetails?,
     @SerializedName("travel_mode")
-    val travelMode: String?, // DRIVING
+    val travelMode: String?, // e.g., DRIVING
     @SerializedName("maneuver")
     val maneuver: String?
 )

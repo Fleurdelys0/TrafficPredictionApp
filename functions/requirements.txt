@@ -1,0 +1,15 @@
+# requirements.txt
+google-cloud-storage>=1.30.0
+pip>=23.0
+setuptools>=68.0.0
+wheel
+firebase-functions>=0.2.0
+firebase-admin>=6.0.1
+requests>=2.25.0
+
+# ML Modeli için eklenenler:
+setuptools>=60.0.0
+pandas>=1.3.0,<2.0.0
+scikit-learn>=1.0.0,<1.4.0
+numpy>=1.20.0,<1.26.4
+joblib>=1.0.0

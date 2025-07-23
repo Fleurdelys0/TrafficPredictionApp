@@ -1,9 +1,25 @@
 package com.example.trafficprediction.ui.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.trafficprediction.data.TrafficPredictionLog
 import com.example.trafficprediction.ui.viewmodels.TrafficViewModel
@@ -23,7 +38,7 @@ import java.util.Locale
 @Composable
 fun PredictionDetailScreen(
     navController: NavController,
-    trafficViewModel: TrafficViewModel // ViewModel artık dışarıdan sağlanıyor
+    trafficViewModel: TrafficViewModel // ViewModel is now provided from outside.
 ) {
     val selectedLog by trafficViewModel.selectedLog.collectAsState()
 
@@ -33,7 +48,7 @@ fun PredictionDetailScreen(
                 title = { Text("Prediction Detail") },
                 navigationIcon = {
                     IconButton(onClick = {
-                        trafficViewModel.clearSelectedLog() // Seçili logu temizle
+                        trafficViewModel.clearSelectedLog() // We clear the selected log.
                         navController.popBackStack()
                     }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -55,7 +70,7 @@ fun PredictionDetailScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text("No log selected or an error occurred.")
-                // Opsiyonel: Geri butonu veya otomatik geri yönlendirme
+                // Optional: We could add a back button or automatic redirection here.
             }
         } else {
             selectedLog?.let { log ->
@@ -75,15 +90,17 @@ fun PredictionDetailContent(log: TrafficPredictionLog, modifier: Modifier = Modi
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // DetailItem("Log ID:", log.logId ?: "N/A") // Kullanıcı tarafından gizlenmesi istendi
-        // DetailItem("User ID:", log.userId ?: "N/A") // Kullanıcı tarafından gizlenmesi istendi
-        // Spacer(modifier = Modifier.height(8.dp)) // Yukarıdakiler kaldırıldığı için bu spacer'a gerek kalmayabilir, duruma göre ayarlanır.
+        // Log ID and User ID are intentionally hidden as per user request.
+        // Spacer might not be needed since the items above were removed; adjust as necessary.
 
         Text("Route Information", style = MaterialTheme.typography.titleMedium)
         Divider(modifier = Modifier.padding(vertical = 4.dp))
         DetailItem("Start Address:", log.startAddress)
         DetailItem("End Address:", log.endAddress)
-        DetailItem("Start Coordinates:", "Lat: ${log.startLat ?: "N/A"}, Lng: ${log.startLng ?: "N/A"}")
+        DetailItem(
+            "Start Coordinates:",
+            "Lat: ${log.startLat ?: "N/A"}, Lng: ${log.startLng ?: "N/A"}"
+        )
         DetailItem("End Coordinates:", "Lat: ${log.endLat ?: "N/A"}, Lng: ${log.endLng ?: "N/A"}")
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -96,11 +113,15 @@ fun PredictionDetailContent(log: TrafficPredictionLog, modifier: Modifier = Modi
         Text("Prediction Result", style = MaterialTheme.typography.titleMedium)
         Divider(modifier = Modifier.padding(vertical = 4.dp))
         DetailItem("Estimated Condition:", log.estimatedCondition ?: "N/A")
-        DetailItem("Predicted Speed:", "${String.format("%.1f", log.predictedSpeed ?: 0.0)} km/h") // Birim km/h olarak güncellendi
-        // Tahmini süreyi göster
-        val formattedTime = log.estimatedTravelTimeMinutes?.let { String.format("%.0f min", it) } ?: "N/A"
+        DetailItem(
+            "Predicted Speed:",
+            "${String.format("%.1f", log.predictedSpeed ?: 0.0)} km/h"
+        ) // Unit updated to km/h.
+        // We show the estimated travel time.
+        val formattedTime =
+            log.estimatedTravelTimeMinutes?.let { String.format("%.0f min", it) } ?: "N/A"
         DetailItem("Est. Travel Time:", formattedTime)
-        // Segment mesafesini de gösterelim (TrafficPredictionLog'a eklenmişti)
+        // Let's also show the segment distance (it was added to TrafficPredictionLog).
         val formattedDistance = log.segmentDistanceKm?.let { String.format("%.1f km", it) } ?: "N/A"
         DetailItem("Segment Distance:", formattedDistance)
 
@@ -117,7 +138,7 @@ fun DetailItem(label: String, value: String) {
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(0.4f) // Ağırlıkla etiket genişliğini ayarla
+            modifier = Modifier.weight(0.4f) // We adjust the label width using weight.
         )
         Text(
             text = value,

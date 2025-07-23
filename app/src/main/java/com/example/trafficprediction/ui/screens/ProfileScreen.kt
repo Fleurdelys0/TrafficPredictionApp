@@ -1,541 +1,529 @@
 package com.example.trafficprediction.ui.screens
 
-import android.util.Log
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import coil.compose.AsyncImage
-import com.example.trafficprediction.R // Eğer bir placeholder drawable kullanacaksanız
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.trafficprediction.ui.theme.TrafficPredictionTheme
-import com.example.trafficprediction.ui.viewmodels.AuthUiState
+import com.example.trafficprediction.R
+import com.example.trafficprediction.data.FavoriteRoute
+import com.example.trafficprediction.data.ThemePreference
 import com.example.trafficprediction.ui.viewmodels.AuthViewModel
-import com.google.firebase.auth.FirebaseUser
-import kotlinx.coroutines.flow.collectLatest // Flow dinleme için import
+import com.example.trafficprediction.ui.viewmodels.ThemeViewModel
 
-// OptIn anotasyonu genellikle Composable fonksiyonun üzerine eklenir
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    themeViewModel: ThemeViewModel = viewModel(), // We added ThemeViewModel.
+    onNavigateToLogin: () -> Unit // Callback to navigate to the Login screen.
 ) {
-    // ViewModel'den state'leri topla
-    val authState by authViewModel.authUiState.collectAsState()
-    val email by authViewModel.email.collectAsState()
-    val password by authViewModel.password.collectAsState()
-    val isPasswordVisible by authViewModel.isPasswordVisible.collectAsState()
-    val isLoading by authViewModel.isLoading.collectAsState()
-    // newDisplayName, currentUserPhotoUrl, selectedImageUri AuthViewModel'den UserProfileSection içinde kullanılacak.
-    // ProfileScreen seviyesinde ayrıca collect etmeye gerek yok, doğrudan UserProfileSection'a geçilecek.
-    // Ancak, UserProfileSection çağrısında bu state'leri ViewModel'den alıp geçmemiz gerekiyor.
+    val currentUser by authViewModel.currentUser.observeAsState()
+    val userProfileData by authViewModel.userProfileData.collectAsState() // We listen to user profile data.
+    val favoriteRoutes by authViewModel.favoriteRoutes.collectAsState()
+    val isLoadingFavorites by authViewModel.isLoadingFavorites.collectAsState()
+    val favoriteRouteError by authViewModel.favoriteRouteError.collectAsState()
 
-    // Hata mesajını AuthUiState'ten veya genel errorMessage'dan al
-    val errorMessage = when(authState) {
-        is AuthUiState.Error -> (authState as AuthUiState.Error).message
-        else -> authViewModel.errorMessage.collectAsState().value // Genel hatalar için
-    }
+    var showAddFavoriteDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) } // State for the settings dialog.
+    val currentTheme by themeViewModel.themePreference.collectAsState()
 
-
-    // Snackbar State
-    val snackbarHostState = remember { SnackbarHostState() }
-    val focusManager = LocalFocusManager.current // Focus Manager
-
-    // ViewModel Olaylarını Dinleme (Snackbar için)
-    LaunchedEffect(Unit) {
-        authViewModel.eventFlow.collectLatest { message ->
-            // Başka bir snackbar gösteriliyorsa onu iptal et (isteğe bağlı)
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(message = message, duration = SnackbarDuration.Short)
+    // We load favorite routes when the user changes or when the screen first opens.
+    LaunchedEffect(key1 = currentUser) {
+        if (currentUser != null) {
+            authViewModel.loadFavoriteRoutes()
         }
     }
 
-    // Scaffold ile Ekran Yapısı
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
-    ) { paddingValues ->
+    if (showSettingsDialog) {
+        SettingsDialog(
+            currentUser = currentUser,
+            currentAvatarIconName = userProfileData?.avatarIconName, // Pass the current avatar.
+            onDismiss = { showSettingsDialog = false },
+            onSave = { newName, selectedAvatar ->
+                authViewModel.updateProfile(newName = newName, avatarIconName = selectedAvatar)
+                showSettingsDialog = false
+            }
+        )
+    }
 
+    Scaffold(
+        floatingActionButton = {
+            if (currentUser != null) {
+                ExtendedFloatingActionButton(
+                    text = { Text(stringResource(id = R.string.add_favorite_route)) },
+                    icon = {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = stringResource(id = R.string.add_favorite_route_desc)
+                        )
+                    },
+                    onClick = { showAddFavoriteDialog = true }
+                )
+            }
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Scaffold padding'ini uygula
-                .padding(16.dp), // Ekstra kendi padding'imiz
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(paddingValues)
+                .padding(16.dp),
         ) {
-            // Duruma göre UI'ı göster
-            when (authState) {
-                is AuthUiState.Loading -> {
-                    Spacer(modifier = Modifier.height(32.dp)) // Adjusted spacer
-                    CircularProgressIndicator()
-                }
-                is AuthUiState.SignedIn -> {
-                    val user = (authState as AuthUiState.SignedIn).user
-                    val collectedNewDisplayName by authViewModel.newDisplayName.collectAsState()
-                    val collectedCurrentUserPhotoUrl by authViewModel.currentUserPhotoUrl.collectAsState()
-                    val collectedSelectedImageUri by authViewModel.selectedImageUri.collectAsState()
-                    val currentIsLoading by authViewModel.isLoading.collectAsState()
-
-
-                    UserProfileSection(
-                        email = user.email,
-                        currentDisplayName = collectedNewDisplayName,
-                        currentPhotoUrl = collectedCurrentUserPhotoUrl,
-                        selectedImageUri = collectedSelectedImageUri,
-                        isLoading = currentIsLoading, // isLoading'i doğru şekilde al
-                        onNewDisplayNameChange = authViewModel::onNewDisplayNameChange,
-                        onUpdateDisplayName = { authViewModel.updateDisplayName() },
-                        onSignOut = { authViewModel.signOut() },
-                        onPickImage = { uri -> authViewModel.onSelectedImageUriChange(uri) },
-                        onUploadAndSetProfilePicture = { authViewModel.uploadAndSetProfilePicture() }
-                    )
-                }
-                is AuthUiState.SignedOut, is AuthUiState.Error -> {
-                    // Hata mesajını LoginRegisterSection'a iletiyoruz
-                    LoginRegisterSection(
-                        email = email,
-                        password = password,
-                        isPasswordVisible = isPasswordVisible,
-                        isLoading = isLoading,
-                        errorMessage = errorMessage, // Düzeltilmiş hata mesajı
-                        onEmailChange = authViewModel::onEmailChange,
-                        onPasswordChange = authViewModel::onPasswordChange,
-                        onTogglePasswordVisibility = authViewModel::togglePasswordVisibility,
-                        onSignIn = {
-                            focusManager.clearFocus() // Klavyeyi kapat
-                            authViewModel.signIn()
-                        },
-                        onSignUp = {
-                            focusManager.clearFocus() // Klavyeyi kapat
-                            authViewModel.signUp()
-                        },
-                        onForgotPasswordClicked = { // YENİ LAMBDA BAĞLANTISI
-                            focusManager.clearFocus()
-                            authViewModel.sendPasswordResetEmail()
-                        },
-                        signUpDisplayName = authViewModel.signUpDisplayName.collectAsState().value, // YENİ
-                        onSignUpDisplayNameChange = authViewModel::onSignUpDisplayNameChange // YENİ
-                    )
-                }
-            }
-        }
-    }
-}
-
-// Giriş yapmış kullanıcı arayüzü
-@Composable
-fun UserProfileSection(
-    email: String?,
-    currentDisplayName: String,
-    currentPhotoUrl: String?,
-    selectedImageUri: android.net.Uri?,
-    isLoading: Boolean,
-    onNewDisplayNameChange: (String) -> Unit,
-    onUpdateDisplayName: () -> Unit, // Adı değişti
-    onSignOut: () -> Unit,
-    onPickImage: (android.net.Uri?) -> Unit, // Seçilen URI'yi ViewModel'e iletmek için
-    onUploadAndSetProfilePicture: () -> Unit
-) {
-    val focusManager = LocalFocusManager.current
-    val context = LocalContext.current
-
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-        onResult = { uri: android.net.Uri? ->
-            onPickImage(uri) // Seçilen URI'yi ViewModel'e bildir
-        }
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Profile",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Box(contentAlignment = Alignment.Center) {
-            AsyncImage(
-                model = selectedImageUri ?: currentPhotoUrl ?: R.drawable.ic_launcher_foreground, // Placeholder ekle
-                contentDescription = "Profile Picture",
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .clickable { imagePickerLauncher.launch("image/*") },
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.ic_launcher_foreground) // Hata durumunda gösterilecek resim
-            )
-            // TODO: Resim üzerinde bir "düzenle" ikonu eklenebilir.
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-            Text("Change Profile Picture")
-        }
-
-        selectedImageUri?.let {
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onUploadAndSetProfilePicture,
-                enabled = !isLoading
-            ) {
-                Text("Upload Picture")
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = currentDisplayName,
-            onValueChange = onNewDisplayNameChange,
-            label = { Text("Display Name") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            enabled = !isLoading,
-            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = {
-                focusManager.clearFocus()
-                if (currentDisplayName.isNotBlank()) {
-                    onUpdateDisplayName()
-                }
-            })
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = email ?: "No email",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-                focusManager.clearFocus()
-                onUpdateDisplayName()
-            },
-            enabled = !isLoading && currentDisplayName.isNotBlank(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Save Display Name")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp)) // Tema seçimi öncesi boşluk
-
-        // --- Tema Seçimi Bölümü ---
-        Text(
-            text = "Theme Settings",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.align(Alignment.Start) // Başlığı sola yasla
-        )
-        Divider(modifier = Modifier.padding(vertical = 4.dp))
-
-        val themeViewModel: com.example.trafficprediction.ui.viewmodels.ThemeViewModel = viewModel()
-        val currentThemePreference by themeViewModel.themePreference.collectAsState()
-        val themeOptions = com.example.trafficprediction.data.ThemePreference.values()
-
-        Column(Modifier.selectableGroup()) {
-            themeOptions.forEach { themeOption ->
-                Row(
-                    Modifier
+            if (currentUser != null) {
+                // User Information and Sign Out Card.
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp)
-                        .selectable(
-                            selected = (themeOption == currentThemePreference),
-                            onClick = { themeViewModel.updateThemePreference(themeOption) },
-                            role = Role.RadioButton
-                        )
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(bottom = 16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    RadioButton(
-                        selected = (themeOption == currentThemePreference),
-                        onClick = null // null recommended for accessibility with screenreaders
-                    )
-                    Text(
-                        text = themeOption.name.replace("_", " ").lowercase()
-                            .replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }, // Enum adını güzelleştir
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
-            }
-        }
-        // --- Tema Seçimi Bölümü Sonu ---
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(80.dp)
+                        ) {
+                            val avatarIcon = when (userProfileData?.avatarIconName) {
+                                "Face" -> Icons.Filled.Face
+                                "Person" -> Icons.Filled.Person
+                                else -> Icons.Default.AccountCircle
+                            }
+                            Icon(
+                                imageVector = avatarIcon,
+                                contentDescription = "User Avatar",
+                                modifier = Modifier.padding(16.dp),
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
 
-        Spacer(modifier = Modifier.weight(1f)) // Çıkış butonunu en alta iter
+                        Text(
+                            text = currentUser?.displayName ?: currentUser?.email ?: "User",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (currentUser?.email != null && currentUser?.displayName != currentUser?.email) {
+                            Text(
+                                text = currentUser!!.email!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
 
-        OutlinedButton(
-            onClick = onSignOut,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            Text("Log Out")
-        }
-    }
-}
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(top = 12.dp)
+                        ) {
+                            Button(
+                                onClick = { showSettingsDialog = true },
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings")
+                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                Text("Settings")
+                            }
+                            FilledTonalButton(
+                                onClick = {
+                                    val nextTheme = when (currentTheme) {
+                                        ThemePreference.LIGHT -> ThemePreference.DARK
+                                        ThemePreference.DARK -> ThemePreference.SYSTEM_DEFAULT
+                                        ThemePreference.SYSTEM_DEFAULT -> ThemePreference.LIGHT
+                                    }
+                                    themeViewModel.updateThemePreference(nextTheme)
+                                },
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Icon(Icons.Default.ColorLens, contentDescription = "Theme")
+                                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                                Text(
+                                    when (currentTheme) {
+                                        ThemePreference.LIGHT -> "Dark Theme"
+                                        ThemePreference.DARK -> "System Theme"
+                                        ThemePreference.SYSTEM_DEFAULT -> "Light Theme"
+                                    }
+                                )
+                            }
+                        }
 
-// Giriş/Kayıt formu arayüzü
-@Composable
-fun LoginRegisterSection(
-    email: String,
-    password: String,
-    isPasswordVisible: Boolean,
-    isLoading: Boolean,
-    errorMessage: String?,
-    onEmailChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    onTogglePasswordVisibility: () -> Unit,
-    onSignIn: () -> Unit,
-    onSignUp: () -> Unit,
-    onForgotPasswordClicked: () -> Unit, // YENİ PARAMETRE
-    signUpDisplayName: String, // Kayıt için görünen ad state'i
-    onSignUpDisplayNameChange: (String) -> Unit // Kayıt için görünen ad değiştirme fonksiyonu
-) {
-    val focusManager = LocalFocusManager.current
-
-    Column( // Formu da Column içine almak daha iyi
-        modifier = Modifier.fillMaxWidth(), // Column genişliği
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Login or Register",
-            style = MaterialTheme.typography.headlineMedium
-        )
-        Spacer(modifier = Modifier.height(24.dp)) // Adjusted spacer
-
-        // Hata mesajı
-        if (errorMessage != null) {
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = onEmailChange,
-            label = { Text("Email") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next
-            ),
-            singleLine = true,
-            enabled = !isLoading
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        // Kayıt için Görünen Ad alanı
-        OutlinedTextField(
-            value = signUpDisplayName,
-            onValueChange = onSignUpDisplayNameChange,
-            label = { Text("Display Name (for Sign Up)") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Next
-            ),
-            singleLine = true,
-            enabled = !isLoading
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = password,
-            onValueChange = onPasswordChange,
-            label = { Text("Password") },
-            modifier = Modifier.fillMaxWidth(),
-            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = {
-                    focusManager.clearFocus()
-                    if (email.isNotBlank() && password.isNotBlank()) {
-                        onSignIn()
+                        OutlinedButton(
+                            onClick = { authViewModel.signOut() },
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Text("Sign Out")
+                        }
                     }
                 }
+
+                Text(
+                    "Favorite Routes",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier
+                        .padding(top = 16.dp, bottom = 8.dp)
+                        .align(Alignment.Start)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (isLoadingFavorites) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else if (favoriteRouteError != null) {
+                    Text(
+                        "Error: $favoriteRouteError",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                    Button(
+                        onClick = { authViewModel.loadFavoriteRoutes() },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) {
+                        Text("Retry")
+                    }
+                } else if (favoriteRoutes.isEmpty()) {
+                    Text(
+                        "No favorite routes added yet.",
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(favoriteRoutes) { route ->
+                            FavoriteRouteItem(route = route, onDelete = {
+                                authViewModel.deleteFavoriteRoute(route.id)
+                            })
+                            Divider()
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "Please sign in to see your profile and favorite routes.",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onNavigateToLogin) { // We use the callback here.
+                        Text("Sign In / Sign Up")
+                    }
+                }
+            }
+
+            if (showAddFavoriteDialog) {
+                AddFavoriteRouteDialog(
+                    onDismiss = { showAddFavoriteDialog = false },
+                    onAddRoute = { routeName, originAddress, destinationAddress ->
+                        authViewModel.addFavoriteRouteFromAddresses(
+                            routeName,
+                            originAddress,
+                            destinationAddress
+                        )
+                    },
+                    isLoading = isLoadingFavorites,
+                    error = favoriteRouteError,
+                    onClearError = { authViewModel.clearFavoriteRouteError() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FavoriteRouteItem(route: FavoriteRoute, onDelete: () -> Unit) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(route.name, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "From: ${route.originAddress.ifEmpty { "N/A" }}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "To: ${route.destinationAddress.ifEmpty { "N/A" }}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "Delete Route",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddFavoriteRouteDialog(
+    onDismiss: () -> Unit,
+    onAddRoute: (name: String, originAddress: String, destinationAddress: String) -> Unit,
+    isLoading: Boolean,
+    error: String?,
+    onClearError: () -> Unit
+) {
+    var routeName by remember { mutableStateOf(TextFieldValue("")) }
+    var originAddress by remember { mutableStateOf(TextFieldValue("")) }
+    var destinationAddress by remember { mutableStateOf(TextFieldValue("")) }
+    var routeNameError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(error) {
+        if (!error.isNullOrBlank()) {
+            android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_LONG).show()
+            onClearError()
+        }
+    }
+
+    Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
             ),
-            trailingIcon = {
-                val image = if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                IconButton(onClick = onTogglePasswordVisibility, enabled = !isLoading) {
-                    Icon(imageVector = image, contentDescription = if (isPasswordVisible) "Hide password" else "Show password")
-                }
-            },
-            singleLine = true,
-            enabled = !isLoading
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Yükleme göstergesi veya Butonlar
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Button(
-                    onClick = {
-                        focusManager.clearFocus()
-                        onSignIn()
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading && email.isNotBlank() && password.isNotBlank() // isLoading kontrolü eklendi
-                ) {
-                    Text("Log In")
+                Text(
+                    "Add New Favorite Route",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                OutlinedTextField(
+                    value = routeName,
+                    onValueChange = { routeName = it; routeNameError = null },
+                    label = { Text("Route Name (e.g., Home to Work)") },
+                    singleLine = true,
+                    isError = routeNameError != null,
+                    enabled = !isLoading
+                )
+                if (routeNameError != null) {
+                    Text(
+                        routeNameError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                OutlinedButton(
-                    onClick = {
-                        focusManager.clearFocus()
-                        onSignUp()
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isLoading && email.isNotBlank() && password.isNotBlank() // isLoading kontrolü eklendi
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = originAddress,
+                    onValueChange = { originAddress = it },
+                    label = { Text("Origin Address") },
+                    singleLine = true,
+                    enabled = !isLoading
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = destinationAddress,
+                    onValueChange = { destinationAddress = it },
+                    label = { Text("Destination Address") },
+                    singleLine = true,
+                    enabled = !isLoading
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (isLoading) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Register")
+                    TextButton(onClick = onDismiss, enabled = !isLoading) {
+                        Text("Cancel")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (routeName.text.isBlank()) {
+                                routeNameError = "Route name cannot be empty"
+                            } else if (originAddress.text.isBlank()) {
+                                routeNameError = "Origin address cannot be empty"
+                            } else if (destinationAddress.text.isBlank()) {
+                                routeNameError = "Destination address cannot be empty"
+                            } else {
+                                routeNameError = null
+                                onAddRoute(
+                                    routeName.text,
+                                    originAddress.text,
+                                    destinationAddress.text
+                                )
+                            }
+                        },
+                        enabled = !isLoading
+                    ) {
+                        Text("Add Route")
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp)) // Butonlar ve şifre sıfırlama arasında boşluk
-            TextButton(
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsDialog(
+    currentUser: com.google.firebase.auth.FirebaseUser?,
+    currentAvatarIconName: String?,
+    onDismiss: () -> Unit,
+    onSave: (newName: String, selectedAvatar: String?) -> Unit
+) {
+    var newName by remember { mutableStateOf(currentUser?.displayName ?: "") }
+    var selectedAvatarIdentifier by remember { mutableStateOf(currentAvatarIconName) }
+
+    val avatarOptions = listOf(
+        "AccountCircle" to Icons.Default.AccountCircle,
+        "Face" to Icons.Filled.Face,
+        "Person" to Icons.Filled.Person
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Profile Settings") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Display Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Choose Avatar:", style = MaterialTheme.typography.titleSmall)
+                Row(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    avatarOptions.forEach { (name, icon) ->
+                        IconButton(
+                            onClick = { selectedAvatarIdentifier = name },
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (selectedAvatarIdentifier == name) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                        ) {
+                            Icon(
+                                icon,
+                                contentDescription = name,
+                                tint = if (selectedAvatarIdentifier == name) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
                 onClick = {
-                    focusManager.clearFocus() // Klavyeyi kapat
-                    onForgotPasswordClicked() // Yeni lambda'yı çağır
-                },
-                modifier = Modifier.align(Alignment.End), // Sağa yasla
-                enabled = !isLoading && email.isNotBlank() // E-posta boş değilse aktif
+                    if (newName.isNotBlank()) {
+                        onSave(newName, selectedAvatarIdentifier)
+                    }
+                }
             ) {
-                Text("Forgot Password?")
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
-        // Spacer(modifier = Modifier.weight(1f)) // Bu Spacer burada gereksiz olabilir
-    } // Column sonu
-}
-
-
-// --- Preview Fonksiyonları ---
-@Preview(showBackground = true, name = "Profile Logged In")
-@Composable
-fun ProfileScreenLoggedInPreview() {
-    TrafficPredictionTheme {
-        // UserProfileSection'ı doğrudan sahte String değerlerle çağır
-        UserProfileSection(
-            email = "preview@example.com",
-            currentDisplayName = "Preview User",
-            currentPhotoUrl = null, // Preview için null
-            selectedImageUri = null, // Preview için null
-            isLoading = false,
-            onNewDisplayNameChange = {},
-            onUpdateDisplayName = {},
-            onSignOut = {},
-            onPickImage = {},
-            onUploadAndSetProfilePicture = {}
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Profile Logged Out")
-@Composable
-fun ProfileScreenLoggedOutPreview() {
-    TrafficPredictionTheme {
-        // Column içinde gösterelim
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            LoginRegisterSection(
-                email = "test@example.com",
-                password = "password",
-                isPasswordVisible = false,
-                isLoading = false, // Yüklenmiyor durumu
-                errorMessage = null, // Hata yok durumu
-                onEmailChange = {},
-                onPasswordChange = {},
-                onTogglePasswordVisibility = {},
-                onSignIn = {},
-                onSignUp = {},
-                onForgotPasswordClicked = {}, // Preview için boş lambda
-                signUpDisplayName = "", // Preview için boş
-                onSignUpDisplayNameChange = {} // Preview için boş lambda
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Profile Login Loading")
-@Composable
-fun ProfileScreenLoadingPreview() {
-    TrafficPredictionTheme {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            LoginRegisterSection(
-                email = "test@example.com",
-                password = "password",
-                isPasswordVisible = false,
-                isLoading = true, // Yükleniyor durumu
-                errorMessage = null,
-                onEmailChange = {},
-                onPasswordChange = {},
-                onTogglePasswordVisibility = {},
-                onSignIn = {},
-                onSignUp = {},
-                onForgotPasswordClicked = {}, // Preview için boş lambda
-                signUpDisplayName = "", // Preview için boş
-                onSignUpDisplayNameChange = {} // Preview için boş lambda
-            )
-        }
-    }
-}
-
-@Preview(showBackground = true, name = "Profile Login Error")
-@Composable
-fun ProfileScreenErrorPreview() {
-    TrafficPredictionTheme {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            LoginRegisterSection(
-                email = "test@example.com",
-                password = "password",
-                isPasswordVisible = false,
-                isLoading = false,
-                errorMessage = "Invalid email or password.", // Hata durumu
-                onEmailChange = {},
-                onPasswordChange = {},
-                onTogglePasswordVisibility = {},
-                onSignIn = {},
-                onSignUp = {},
-                onForgotPasswordClicked = {}, // Preview için boş lambda
-                signUpDisplayName = "", // Preview için boş
-                onSignUpDisplayNameChange = {} // Preview için boş lambda
-            )
-        }
-    }
+    )
 }

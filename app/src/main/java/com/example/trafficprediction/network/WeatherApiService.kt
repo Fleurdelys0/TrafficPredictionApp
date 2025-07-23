@@ -11,6 +11,6 @@ interface WeatherApiService {
         @Query("lat") latitude: Double,
         @Query("lon") longitude: Double,
         @Query("appid") apiKey: String,
-        @Query("units") units: String = "metric" // Sıcaklığı Celsius olarak almak için "metric"
+        @Query("units") units: String = "metric" // We use "metric" to get the temperature in Celsius.
     ): Response<CurrentWeatherResponse>
 }

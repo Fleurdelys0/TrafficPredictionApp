@@ -2,22 +2,22 @@ package com.example.trafficprediction.network
 
 import com.google.gson.annotations.SerializedName
 
-// Places API Nearby Search yanıtı için ana data class
+// Main data class for the Places API Nearby Search response.
 data class PlacesNearbySearchResponse(
     @SerializedName("html_attributions")
     val htmlAttributions: List<Any>?,
     @SerializedName("results")
     val results: List<PlaceResult>?,
     @SerializedName("status")
-    val status: String?, // OK, ZERO_RESULTS, OVER_QUERY_LIMIT, REQUEST_DENIED, INVALID_REQUEST, UNKNOWN_ERROR
+    val status: String?, // Possible values: OK, ZERO_RESULTS, OVER_QUERY_LIMIT, REQUEST_DENIED, INVALID_REQUEST, UNKNOWN_ERROR
     @SerializedName("next_page_token")
     val nextPageToken: String?
 )
 
-// Her bir yer (place) için detayları içeren data class
+// Data class containing details for each place.
 data class PlaceResult(
     @SerializedName("business_status")
-    val businessStatus: String?, // OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY
+    val businessStatus: String?, // e.g., OPERATIONAL, CLOSED_TEMPORARILY, CLOSED_PERMANENTLY
     @SerializedName("geometry")
     val geometry: PlaceGeometry?,
     @SerializedName("icon")
@@ -47,10 +47,10 @@ data class PlaceResult(
     @SerializedName("user_ratings_total")
     val userRatingsTotal: Int?,
     @SerializedName("vicinity")
-    val vicinity: String? // Adresin daha kısa bir formu
+    val vicinity: String? // A shorter form of the address.
 )
 
-// Yer geometrisi (konum)
+// Place geometry (location).
 data class PlaceGeometry(
     @SerializedName("location")
     val location: PlaceLocation?,
@@ -58,7 +58,7 @@ data class PlaceGeometry(
     val viewport: PlaceViewport?
 )
 
-// Enlem ve boylam
+// Latitude and longitude.
 data class PlaceLocation(
     @SerializedName("lat")
     val lat: Double?,
@@ -66,7 +66,7 @@ data class PlaceLocation(
     val lng: Double?
 )
 
-// Harita görünüm alanı
+// Map viewport.
 data class PlaceViewport(
     @SerializedName("northeast")
     val northeast: PlaceLocation?,
@@ -74,13 +74,13 @@ data class PlaceViewport(
     val southwest: PlaceLocation?
 )
 
-// Açılış saatleri
+// Opening hours.
 data class PlaceOpeningHours(
     @SerializedName("open_now")
     val openNow: Boolean?
 )
 
-// Yer fotoğrafı
+// Place photo.
 data class PlacePhoto(
     @SerializedName("height")
     val height: Int?,
@@ -92,7 +92,7 @@ data class PlacePhoto(
     val width: Int?
 )
 
-// Plus Code (açık konum kodu)
+// Plus Code (open location code).
 data class PlacePlusCode(
     @SerializedName("compound_code")
     val compoundCode: String?,

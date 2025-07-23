@@ -1,15 +1,38 @@
 package com.example.trafficprediction.ui.screens
 
-import android.app.Application
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items // items fonksiyonu için
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete // Silme ikonu için
-import androidx.compose.material.icons.filled.Warning // Hata ikonu için
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,27 +40,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.trafficprediction.Screen // Navigasyon için
-import com.example.trafficprediction.data.TrafficPredictionLog // Log data class'ı
+import com.example.trafficprediction.Screen
+import com.example.trafficprediction.data.TrafficPredictionLog
 import com.example.trafficprediction.ui.theme.TrafficPredictionTheme
 import com.example.trafficprediction.ui.viewmodels.TrafficViewModel
-import java.text.SimpleDateFormat // Tarih formatlama için
-import java.util.* // Date ve Locale için
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun PredictionsScreen(
-    navController: NavController, // NavController eklendi
-    trafficViewModel: TrafficViewModel // ViewModel artık dışarıdan sağlanıyor
+    navController: NavController, // NavController added.
+    trafficViewModel: TrafficViewModel // ViewModel is now provided from outside.
 ) {
-    // ViewModel'den geçmiş state'lerini al
+    // We get the history states from the ViewModel.
     val historyList by trafficViewModel.predictionHistory.collectAsState()
     val isLoading by trafficViewModel.historyLoading.collectAsState()
     val errorMessage by trafficViewModel.historyErrorMessage.collectAsState()
 
-    // Ekran ilk açıldığında veya ViewModel değiştiğinde geçmişi yükle
-    LaunchedEffect(Unit) { // Key olarak Unit, sadece ilk açılışta çalıştırır
+    // We load the history when the screen first opens or when the ViewModel changes.
+    LaunchedEffect(Unit) { // Using Unit as a key runs this only on initial composition.
         trafficViewModel.loadPredictionHistory()
     }
 
@@ -79,17 +101,21 @@ fun PredictionsScreen(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Yükleme Durumu
+        // Loading State
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         }
-        // Hata Durumu
+        // Error State
         else if (errorMessage != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                    Icon(
+                        Icons.Filled.Warning,
+                        contentDescription = "Error",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = errorMessage ?: "Could not load history.",
@@ -103,19 +129,19 @@ fun PredictionsScreen(
                 }
             }
         }
-        // Başarılı Durum (Liste Boş Olsa Bile)
+        // Success State (even if the list is empty)
         else {
             if (historyList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No prediction history found.")
                 }
             } else {
-                // Geçmişi Listeleyen LazyColumn
+                // LazyColumn for displaying the history.
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp) // Elemanlar arası boşluk
+                    verticalArrangement = Arrangement.spacedBy(8.dp) // Spacing between items.
                 ) {
-                    items(historyList) { logEntry -> // Listeyi işle
+                    items(historyList) { logEntry -> // Process the list.
                         PredictionHistoryItem(
                             logEntry = logEntry,
                             onClick = {
@@ -134,31 +160,31 @@ fun PredictionsScreen(
     }
 }
 
-// Geçmiş listesindeki her bir elemanı gösteren Composable
+// Composable for displaying each item in the history list.
 @Composable
 fun PredictionHistoryItem(
     logEntry: TrafficPredictionLog,
-    onClick: () -> Unit, // Tıklama callback'i eklendi
-    onDeleteRequest: () -> Unit // Silme isteği için callback eklendi
+    onClick: () -> Unit, // Click callback added.
+    onDeleteRequest: () -> Unit // Callback for delete request added.
 ) {
     val cardColor = when (logEntry.estimatedCondition) {
         "Heavy" -> Color.Red.copy(alpha = 0.1f)
-        "Moderate" -> Color(0xFFFFA500).copy(alpha = 0.15f) // Orange
+        "Moderate" -> Color(0xFFFFA500).copy(alpha = 0.15f) // Orange color for moderate.
         "Light" -> Color.Green.copy(alpha = 0.1f)
         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     }
 
-    // Tarih formatlayıcı
+    // Date formatter.
     val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick), // Kartı tıklanabilir yap
+            .clickable(onClick = onClick), // Make the card clickable.
         colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) { // Increased padding
-            // Adresler
+        Column(modifier = Modifier.padding(16.dp)) { // Increased padding.
+            // Addresses.
             Text(
                 text = "From: ${logEntry.startAddress.ifBlank { "N/A" }}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -170,29 +196,34 @@ fun PredictionHistoryItem(
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
-            // Zaman ve Gün
+            // Time and Day.
             Text(
                 text = "Time: ${logEntry.requestedTime} (${logEntry.requestedDayType})",
                 style = MaterialTheme.typography.bodySmall
             )
-            // Tahmin
+            // Prediction.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) { // Sol taraf için Column
+                Column(modifier = Modifier.weight(1f)) { // Column for the left side.
                     Text(
                         text = "Prediction: ${logEntry.estimatedCondition ?: "N/A"}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        // Hızı formatla
-                        text = "Speed: ${String.format("%.1f", logEntry.predictedSpeed ?: 0.0)} u/hr",
+                        // Format the speed.
+                        text = "Speed: ${
+                            String.format(
+                                "%.1f",
+                                logEntry.predictedSpeed ?: 0.0
+                            )
+                        } u/hr",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                IconButton(onClick = onDeleteRequest) { // Silme butonu eklendi
+                IconButton(onClick = onDeleteRequest) { // Delete button added.
                     Icon(
                         imageVector = Icons.Filled.Delete,
                         contentDescription = "Delete Log",
@@ -200,12 +231,12 @@ fun PredictionHistoryItem(
                     )
                 }
             }
-            // Zaman Damgası
+            // Timestamp.
             logEntry.timestamp?.toDate()?.let { date ->
                 Text(
                     text = "Saved: ${dateFormatter.format(date)}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = LocalContentColor.current.copy(alpha = 0.7f), // Biraz soluk
+                    color = LocalContentColor.current.copy(alpha = 0.7f), // Slightly faded.
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
@@ -216,16 +247,16 @@ fun PredictionHistoryItem(
 @Preview(showBackground = true)
 @Composable
 fun PredictionsScreenPreview() {
-    // Preview için sahte veri oluşturabiliriz
-    // NavController'ı Preview'da sağlamak için sahte bir NavController gerekebilir
-    // veya PredictionsScreen'in Preview'ını NavController olmadan çağıracak şekilde düzenleyebiliriz.
-    // Şimdilik bu Preview'ı yorum satırına alalım veya basit bir NavController ile çağıralım.
-    // val navController = rememberNavController() // Bu Preview içinde çalışmayabilir.
-    // val previewViewModel = TrafficViewModel(Application()) // ViewModel dışarıdan sağlanacağı için Preview'da mock gerekebilir
+    // We can create mock data for the Preview.
+    // A mock NavController might be needed to provide it in the Preview,
+    // or we could adjust the Preview of PredictionsScreen to be called without a NavController.
+    // For now, let's comment out this Preview or call it with a simple NavController.
+    // val navController = rememberNavController() // This might not work inside a Preview.
+    // val previewViewModel = TrafficViewModel(Application()) // ViewModel is provided externally, so a mock might be needed in Preview.
 
     TrafficPredictionTheme {
-        // PredictionsScreen(navController = rememberNavController(), trafficViewModel = viewModel()) // Preview için geçici
-        // Basit bir liste gösterimi için:
+        // PredictionsScreen(navController = rememberNavController(), trafficViewModel = viewModel()) // Temporary for Preview.
+        // For a simple list display:
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(1) {
                 PredictionHistoryItem(
@@ -240,7 +271,7 @@ fun PredictionsScreenPreview() {
                         timestamp = com.google.firebase.Timestamp.now()
                     ),
                     onClick = {},
-                    onDeleteRequest = {} // Preview için boş bırakılabilir
+                    onDeleteRequest = {} // Can be left empty for Preview.
                 )
             }
         }

@@ -1,3 +1,33 @@
 <resources>
-    <string name="app_name">TrafficPrediction</string>
+    <string name="app_name">Traffic Prediction</string>
+    <string name="add_favorite_route">Add Favorite Route</string>
+    <string name="add_favorite_route_desc">Add new favorite route</string>
+
+    <!-- Login Screen -->
+    <string name="login_screen_title">Login</string>
+    <string name="login_welcome">Welcome Back!</string>
+    <string name="email_label">Email</string>
+    <string name="password_label">Password</string>
+    <string name="login_button">Login</string>
+    <string name="no_account_signup">Don\'t have an account? Sign Up</string>
+    <string name="forgot_password_button">Forgot Password?</string>
+    <string name="fill_all_fields">Please fill all fields.</string>
+    <string name="password_reset_email_sent_check_inbox">Password reset email sent. Check your inbox.</string>
+    <string name="enter_email_for_password_reset">Please enter your email to reset password.</string>
+    <string name="back">Back</string>
+    <string name="hide_password">Hide password</string>
+    <string name="show_password">Show password</string>
+    <string name="login_failed">Login Failed: %1$s</string>
+
+
+    <!-- SignUp Screen -->
+    <string name="signup_screen_title">Sign Up</string>
+    <string name="create_account_title">Create Account</string>
+    <string name="display_name_label">Display Name</string>
+    <string name="confirm_password_label">Confirm Password</string>
+    <string name="signup_button">Sign Up</string>
+    <string name="already_have_account_login">Already have an account? Login</string>
+    <string name="passwords_do_not_match">Passwords do not match.</string>
+    <string name="signup_failed">Sign Up Failed: %1$s</string>
+
 </resources>

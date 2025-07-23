@@ -18,7 +18,7 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ThemePreference.SYSTEM_DEFAULT // Başlangıç değeri
+            initialValue = ThemePreference.SYSTEM_DEFAULT // Initial value.
         )
 
     fun updateThemePreference(newThemePreference: ThemePreference) {

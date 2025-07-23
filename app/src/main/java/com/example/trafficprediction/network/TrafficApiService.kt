@@ -7,17 +7,17 @@ import retrofit2.http.Query
 
 interface TrafficApiService {
 
-    // Cloud Function URL'si .run.app olduğu için @GET("/") kullanmıştık
+    // Since our Cloud Function URL is a .run.app, we used @GET("/").
     @GET("/")
     suspend fun getTrafficPrediction(
-        @Header("x-api-key") apiKey: String, // API Anahtarı
-        // --- YENİ PARAMETRELER ---
+        @Header("x-api-key") apiKey: String, // Our API Key.
+
         @Query("from_x") fromX: Double,
         @Query("from_y") fromY: Double,
         @Query("to_x") toX: Double,
         @Query("to_y") toY: Double,
-        @Query("time") time: Int,           // 8, 14, veya 20
-        @Query("is_weekday") isWeekday: Int // 0 veya 1
-        // --- ---
-    ): Response<PredictionResponse> // Yanıt sınıfı aynı kalır
+        @Query("time") time: Int,           // Can be 8, 14, or 20.
+        @Query("is_weekday") isWeekday: Int // Can be 0 or 1.
+
+    ): Response<PredictionResponse> // The response class remains the same.
 }

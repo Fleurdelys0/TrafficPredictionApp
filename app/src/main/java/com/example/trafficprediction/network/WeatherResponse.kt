@@ -26,9 +26,9 @@ data class CurrentWeatherResponse(
     @SerializedName("id")
     val id: Int?,
     @SerializedName("name")
-    val name: String?, // Şehir adı
+    val name: String?, // City name.
     @SerializedName("cod")
-    val cod: Int? // Yanıt kodu (200 OK gibi)
+    val cod: Int? // Response code (e.g., 200 for OK).
 )
 
 data class Coord(
@@ -40,18 +40,18 @@ data class Coord(
 
 data class WeatherDescription(
     @SerializedName("id")
-    val id: Int?, // Hava durumu condition ID
+    val id: Int?, // Weather condition ID.
     @SerializedName("main")
-    val main: String?, // Hava durumu parametresi (Rain, Snow, Extreme etc.)
+    val main: String?, // Weather parameter (e.g., Rain, Snow, Extreme).
     @SerializedName("description")
-    val description: String?, // Hava durumu açıklaması
+    val description: String?, // Weather condition description.
     @SerializedName("icon")
-    val icon: String? // Hava durumu ikon ID'si
+    val icon: String? // Weather icon ID.
 )
 
 data class WeatherMain(
     @SerializedName("temp")
-    val temp: Double?, // Sıcaklık. Varsayılan: Kelvin
+    val temp: Double?, // Temperature. Default: Kelvin.
     @SerializedName("feels_like")
     val feelsLike: Double?,
     @SerializedName("temp_min")
@@ -73,7 +73,7 @@ data class Wind(
 
 data class Clouds(
     @SerializedName("all")
-    val all: Int? // Bulutluluk yüzdesi
+    val all: Int? // Cloudiness percentage.
 )
 
 data class Sys(

@@ -1,10 +1,10 @@
 package com.example.trafficprediction.data
 
-import com.google.firebase.Timestamp // Firestore zaman damgası için
+import com.google.firebase.Timestamp // For Firestore timestamps.
 import com.google.firebase.firestore.DocumentId
-import com.google.firebase.firestore.ServerTimestamp // Sunucu zamanı için
+import com.google.firebase.firestore.ServerTimestamp // For server-generated timestamps.
 
-// Firestore'a kaydedilecek tahmin logu yapısı
+// This data class represents the structure of a prediction log that we'll save to Firestore.
 data class TrafficPredictionLog(
     @DocumentId val logId: String? = null,
     val userId: String? = null,
@@ -16,14 +16,14 @@ data class TrafficPredictionLog(
     val startLng: Double? = null,
     val endLat: Double? = null,
     val endLng: Double? = null,
-    val predictedSpeed: Double? = null, // Bu, predictedSpeedKmh olabilir, ViewModel'de buna göre ayarlanacak
+    val predictedSpeed: Double? = null, // This could be predictedSpeedKmh; we'll adjust it in the ViewModel accordingly.
     val estimatedCondition: String? = "",
-    val segmentDistanceKm: Double? = null, // YENİ
-    val estimatedTravelTimeMinutes: Double? = null, // YENİ
+    val segmentDistanceKm: Double? = null,
+    val estimatedTravelTimeMinutes: Double? = null,
     @ServerTimestamp
     val timestamp: Timestamp? = null
 ) {
-    // Firestore'un data class'ı düzgün işlemesi için boş constructor gerekebilir.
+    // Firestore might need a no-argument constructor to properly handle the data class.
     constructor() : this(
         logId = null,
         userId = null,
@@ -36,9 +36,9 @@ data class TrafficPredictionLog(
         endLat = null,
         endLng = null,
         predictedSpeed = null,
-        estimatedCondition = null, // estimatedCondition String? olduğu için null olabilir
-        segmentDistanceKm = null, // YENİ
-        estimatedTravelTimeMinutes = null, // YENİ
+        estimatedCondition = null, // estimatedCondition is String?, so it can be null.
+        segmentDistanceKm = null,
+        estimatedTravelTimeMinutes = null,
         timestamp = null
     )
 }

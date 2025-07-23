@@ -1,12 +1,12 @@
-// Kök build.gradle.kts
+// Root build.gradle.kts file for our project.
 
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.android) apply false
-    alias(libs.plugins.google.services) apply false // Eğer toml'da tanımlıysa
+    alias(libs.plugins.google.services) apply false // If defined in toml.
     alias(libs.plugins.compose.compiler) apply false
-    // VEYA ŞİMDİLİK BÖYLE KALABİLİR:
+    // OR IT CAN STAY LIKE THIS FOR NOW:
     // id("com.google.gms.google-services") version "4.4.2" apply false
 
-    // Compose Compiler tanımı BURADA OLMAMALI!
+    // The Compose Compiler definition SHOULD NOT BE HERE!
 }

@@ -1,6 +1,5 @@
 package com.example.trafficprediction.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -44,9 +43,9 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun TrafficPredictionTheme(
-    themeViewModel: ThemeViewModel = viewModel(), // ViewModel'i enjekte et
+    themeViewModel: ThemeViewModel = viewModel(), // We inject the ViewModel here.
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = false, // Dinamik renk şimdilik kapalı kalsın
+    dynamicColor: Boolean = true, // We enable dynamic color.
     content: @Composable () -> Unit
 ) {
     val themePreference by themeViewModel.themePreference.collectAsState()
@@ -62,6 +61,7 @@ fun TrafficPredictionTheme(
             val context = LocalContext.current
             if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+
         useDarkTheme -> DarkColorScheme
         else -> LightColorScheme
     }

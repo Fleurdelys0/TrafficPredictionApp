@@ -2,7 +2,7 @@ package com.example.trafficprediction.network
 
 import com.google.gson.annotations.SerializedName
 
-// Genel Geocoding yanıtı
+// This is our general Geocoding response structure.
 data class GeocodingResponse(
     @SerializedName("results")
     val results: List<GeocodingResult>?,
@@ -10,21 +10,21 @@ data class GeocodingResponse(
     val status: String?
 )
 
-// Her bir sonuç
+// Represents each individual result from the Geocoding API.
 data class GeocodingResult(
-    @SerializedName("formatted_address") // Eklendi
-    val formattedAddress: String?,       // Eklendi
+    @SerializedName("formatted_address")
+    val formattedAddress: String?, // The human-readable address.
     @SerializedName("geometry")
     val geometry: Geometry?
 )
 
-// Geometri bilgisi (konumu içerir)
+// Contains geometry information, including the location.
 data class Geometry(
     @SerializedName("location")
     val location: Location?
 )
 
-// Enlem ve Boylam
+// Represents latitude and longitude.
 data class Location(
     @SerializedName("lat")
     val latitude: Double?,

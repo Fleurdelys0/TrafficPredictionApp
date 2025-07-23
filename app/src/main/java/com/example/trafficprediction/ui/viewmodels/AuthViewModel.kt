@@ -1,341 +1,381 @@
 package com.example.trafficprediction.ui.viewmodels
 
+// We'll use specific ApiInstances instead of RetrofitInstance imports.
 import android.app.Application
-import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.example.trafficprediction.data.AuthRepository
+import com.example.trafficprediction.data.FavoriteRoute
+import com.example.trafficprediction.data.TrafficRepository
+import com.example.trafficprediction.network.GeocodingApiInstance
+import com.example.trafficprediction.network.TrafficApiInstance
+import com.example.trafficprediction.network.WeatherApiInstance
+import com.google.android.libraries.places.api.Places
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import android.util.Log
-import com.example.trafficprediction.utils.NetworkUtils
-import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
-import com.google.firebase.auth.FirebaseAuthInvalidUserException
-import com.google.firebase.auth.FirebaseAuthUserCollisionException
-import com.google.firebase.auth.FirebaseAuthWeakPasswordException
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 
-// Kimlik doğrulama durumunu temsil eden sealed class/interface (isteğe bağlı ama iyi pratik)
-sealed interface AuthUiState {
-    object Loading : AuthUiState
-    object SignedOut : AuthUiState
-    data class SignedIn(val user: FirebaseUser) : AuthUiState
-    data class Error(val message: String) : AuthUiState
-}
+// Kullanıcının Firestore'daki ek profil bilgilerini tutmak için data class
+data class UserProfileData(
+    val avatarIconName: String? = null
+    // We can add other fields here in the future.
+)
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val authRepository = AuthRepository()
+    private val authRepository = AuthRepository() // Application parameter removed.
 
-    // Kimlik doğrulama durumunu tutan StateFlow
-    private val _authUiState = MutableStateFlow<AuthUiState>(AuthUiState.Loading)
-    val authUiState: StateFlow<AuthUiState> = _authUiState.asStateFlow()
+    // To initialize TrafficRepository, we need PlacesClient.
+    // PlacesClient should be initialized with the Application context.
+    // This might have been done in MainApplication, or we can do it here.
+    // For now, we assume it's initialized in MainApplication.
+    private val placesClient = Places.createClient(application.applicationContext)
+    private val trafficRepository = TrafficRepository(
+        context = application.applicationContext,
+        trafficApiService = TrafficApiInstance.api, // Corrected.
+        geocodingApiService = GeocodingApiInstance.api, // Corrected.
+        weatherApiService = WeatherApiInstance.api, // Corrected.
+        placesClient = placesClient
+    )
 
-    // --- UI State'leri (Giriş formu için) ---
-    private val _email = MutableStateFlow("")
-    val email: StateFlow<String> = _email.asStateFlow()
+    private val _currentUser = MutableLiveData<FirebaseUser?>()
+    val currentUser: LiveData<FirebaseUser?> = _currentUser
 
-    private val _password = MutableStateFlow("")
-    val password: StateFlow<String> = _password.asStateFlow()
+    // We define the AuthState sealed class.
+    sealed class AuthState {
+        object Idle : AuthState()
+        object Loading : AuthState()
+        data class Authenticated(val user: FirebaseUser?) : AuthState() // FirebaseUser can be nullable.
+        data class Error(val message: String) : AuthState()
+    }
 
-    private val _isPasswordVisible = MutableStateFlow(false)
-    val isPasswordVisible: StateFlow<Boolean> = _isPasswordVisible.asStateFlow()
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false) // Giriş/kayıt işlemi için
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _errorMessage = MutableStateFlow<String?>(null) // Giriş/kayıt hataları için
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    private val authStateListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val user = firebaseAuth.currentUser
+        _currentUser.value = user
+        if (user != null) {
+            _authState.value = AuthState.Authenticated(user) // We update the AuthState.
+            loadFavoriteRoutes()
+            loadUserProfileData(user.uid)
+        } else {
+            _authState.value = AuthState.Idle // Or a state like AuthState.Unauthenticated.
+            _favoriteRoutes.value = emptyList()
+            _userProfileData.value = null
+        }
+    }
 
-    // Görünen ad için StateFlow
-    private val _newDisplayName = MutableStateFlow("")
-    val newDisplayName: StateFlow<String> = _newDisplayName.asStateFlow()
+    private val _favoriteRoutes = MutableStateFlow<List<FavoriteRoute>>(emptyList())
+    val favoriteRoutes: StateFlow<List<FavoriteRoute>> = _favoriteRoutes.asStateFlow()
 
-    // Seçilen profil resmi URI'si için StateFlow
-    private val _selectedImageUri = MutableStateFlow<Uri?>(null)
-    val selectedImageUri: StateFlow<Uri?> = _selectedImageUri.asStateFlow()
+    private val _isLoadingFavorites = MutableStateFlow(false)
+    val isLoadingFavorites: StateFlow<Boolean> = _isLoadingFavorites.asStateFlow()
 
-    // Mevcut kullanıcının profil resmi URL'si için StateFlow
-    private val _currentUserPhotoUrl = MutableStateFlow<String?>(null)
-    val currentUserPhotoUrl: StateFlow<String?> = _currentUserPhotoUrl.asStateFlow()
+    private val _favoriteRouteError = MutableStateFlow<String?>(null)
+    val favoriteRouteError: StateFlow<String?> = _favoriteRouteError.asStateFlow()
 
-    // Kayıt sırasında girilen görünen ad için StateFlow
-    private val _signUpDisplayName = MutableStateFlow("")
-    val signUpDisplayName: StateFlow<String> = _signUpDisplayName.asStateFlow()
-
-    private val _eventFlow = MutableSharedFlow<String>() // Başarı mesajlarını taşıyacak
-    val eventFlow = _eventFlow.asSharedFlow()
-    // --- ---
+    private val _userProfileData = MutableStateFlow<UserProfileData?>(null)
+    val userProfileData: StateFlow<UserProfileData?> = _userProfileData.asStateFlow()
 
     init {
-        // ViewModel başlatıldığında mevcut kullanıcı durumunu kontrol et
-        checkCurrentUser()
+        FirebaseAuth.getInstance().addAuthStateListener(authStateListener)
+        // We'll remove the listener when the ViewModel is cleared.
     }
 
-    private fun checkCurrentUser() {
-        val currentUser = authRepository.getCurrentUser()
-        if (currentUser != null) {
-            Log.d("AuthViewModel", "User already signed in: ${currentUser.email}, DisplayName: ${currentUser.displayName}, PhotoURL: ${currentUser.photoUrl}")
-            _authUiState.value = AuthUiState.SignedIn(currentUser)
-            _newDisplayName.value = currentUser.displayName ?: "" // Görünen adı yükle
-            _currentUserPhotoUrl.value = currentUser.photoUrl?.toString() // Profil resmi URL'sini yükle
-        } else {
-            Log.d("AuthViewModel", "No user signed in.")
-            _authUiState.value = AuthUiState.SignedOut
-        }
-    }
-
-    // --- Input Değişiklikleri ---
-    fun onEmailChange(value: String) { _email.value = value }
-    fun onPasswordChange(value: String) { _password.value = value }
-    fun togglePasswordVisibility() { _isPasswordVisible.value = !_isPasswordVisible.value }
-    fun onNewDisplayNameChange(value: String) { _newDisplayName.value = value } // Profildeki adı düzenlemek için
-    fun onSignUpDisplayNameChange(value: String) { _signUpDisplayName.value = value } // Kayıttaki adı almak için
-    fun onSelectedImageUriChange(uri: Uri?) { _selectedImageUri.value = uri }
-    // --- ---
-
-    // --- Kimlik Doğrulama ve Profil İşlemleri ---
-
-    fun updateDisplayName() { // Sadece görünen adı güncellemek için ayrı bir fonksiyon
-        if (!NetworkUtils.isNetworkAvailable(getApplication())) {
-            _errorMessage.value = "No internet connection available."
-            return
-        }
-        val currentDisplayName = _newDisplayName.value.trim()
-        if (currentDisplayName.isEmpty()) {
-            _errorMessage.value = "Display name cannot be empty."
-            return
-        }
-
+    private fun loadUserProfileData(userId: String) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            // Sadece displayName'i güncelle, photoUri null kalsın
-            val result = authRepository.updateUserProfile(displayName = currentDisplayName, photoUri = null)
+            Log.d("AuthViewModel", "Loading user profile data for user: $userId")
+            val result = authRepository.getUserProfileData(userId)
             result.fold(
-                onSuccess = { updatedUser ->
-                    _authUiState.value = AuthUiState.SignedIn(updatedUser)
-                    _newDisplayName.value = updatedUser.displayName ?: ""
-                    _currentUserPhotoUrl.value = updatedUser.photoUrl?.toString()
-                    _eventFlow.emit("Display name updated successfully!")
-                    Log.d("AuthViewModel", "Display name updated: ${updatedUser.displayName}")
+                onSuccess = { data ->
+                    _userProfileData.value = data
+                    Log.d("AuthViewModel", "Successfully loaded user profile data: $data")
                 },
                 onFailure = { exception ->
-                    _errorMessage.value = exception.localizedMessage ?: "Failed to update display name."
-                    Log.e("AuthViewModel", "Display name update failed", exception)
+                    Log.e("AuthViewModel", "Error loading user profile data for $userId", exception)
+                    _userProfileData.value =
+                        UserProfileData() // Default or empty data in case of error.
                 }
             )
-            _isLoading.value = false
         }
     }
 
-    fun uploadAndSetProfilePicture() {
-        if (!NetworkUtils.isNetworkAvailable(getApplication())) {
-            _errorMessage.value = "No internet connection available."
-            return
-        }
-        val imageUriToUpload = _selectedImageUri.value
-        if (imageUriToUpload == null) {
-            _errorMessage.value = "Please select an image first."
-            return
-        }
-        val currentUser = authRepository.getCurrentUser()
-        if (currentUser == null) {
-            _errorMessage.value = "User not logged in."
-            return
-        }
-
-        viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            Log.d("AuthViewModel", "Starting profile picture upload for user: ${currentUser.uid}")
-
-            // 1. Resmi Storage'a yükle
-            val uploadResult = authRepository.uploadProfileImage(currentUser.uid, imageUriToUpload)
-            uploadResult.fold(
-                onSuccess = { downloadUrl ->
-                    Log.d("AuthViewModel", "Image uploaded, download URL: $downloadUrl")
-                    // 2. Kullanıcı profilini yeni resim URL'si ile güncelle
-                    // displayName olarak _newDisplayName.value veya currentUser.displayName kullanılabilir.
-                    // Eğer kullanıcı aynı anda hem adı hem resmi değiştirmek istiyorsa _newDisplayName.value daha mantıklı.
-                    // Şimdilik sadece resmi güncellediğimizi varsayalım, adı değiştirmek için ayrı bir buton var.
-                    val currentDisplayNameForUpdate = _newDisplayName.value.takeIf { it.isNotBlank() } ?: currentUser.displayName
-
-                    val profileUpdateResult = authRepository.updateUserProfile(
-                        displayName = currentDisplayNameForUpdate, // Mevcut veya yeni girilen adı kullan
-                        photoUri = downloadUrl // Storage'dan alınan URL (Uri tipinde)
-                    )
-                    profileUpdateResult.fold(
-                        onSuccess = { updatedUser ->
-                            _authUiState.value = AuthUiState.SignedIn(updatedUser)
-                            _newDisplayName.value = updatedUser.displayName ?: ""
-                            _currentUserPhotoUrl.value = updatedUser.photoUrl?.toString()
-                            _selectedImageUri.value = null // Seçimi temizle
-                            _eventFlow.emit("Profile picture updated successfully!")
-                            Log.d("AuthViewModel", "Profile picture updated for: ${updatedUser.email}")
-                        },
-                        onFailure = { e ->
-                            _errorMessage.value = e.localizedMessage ?: "Failed to update profile with new picture."
-                            Log.e("AuthViewModel", "Failed to update profile with picture URL", e)
-                        }
-                    )
-                },
-                onFailure = { e ->
-                    _errorMessage.value = e.localizedMessage ?: "Failed to upload image."
-                    Log.e("AuthViewModel", "Image upload failed", e)
-                }
-            )
-            _isLoading.value = false
-        }
+    override fun onCleared() {
+        super.onCleared()
+        FirebaseAuth.getInstance().removeAuthStateListener(authStateListener)
     }
 
-
-    fun signUp() {
-        if (!NetworkUtils.isNetworkAvailable(getApplication())) { // AuthViewModel da AndroidViewModel olmalı
-            _errorMessage.value = "No internet connection available."
-            return
-        }
-
-        val currentEmail = _email.value.trim()
-        val currentPassword = _password.value.trim()
-        val currentSignUpDisplayName = _signUpDisplayName.value.trim() // Kayıt için girilen adı al
-
-        if (currentEmail.isBlank() || currentPassword.isBlank()) {
-            _errorMessage.value = "Please enter email and password."
-            return
-        }
-        if (currentSignUpDisplayName.isBlank()){ // Görünen ad boş olamaz
-            _errorMessage.value = "Please enter a display name."
-            return
-        }
-        // Şifre uzunluğu kontrolü gibi ek doğrulamalar eklenebilir
-
+    fun signIn(email: String, password: String) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            Log.d("AuthViewModel", "Sign up started for $currentEmail with display name $currentSignUpDisplayName")
-
-            // AuthRepository'deki signUp fonksiyonuna displayName'i de gönder
-            val result = authRepository.signUp(currentEmail, currentPassword, currentSignUpDisplayName)
+            _authState.value = AuthState.Loading
+            val result = authRepository.signIn(email, password)
             result.fold(
                 onSuccess = { user ->
-                    Log.d("AuthViewModel", "Sign up success: ${user.email}, DisplayName: ${user.displayName}")
-                    _authUiState.value = AuthUiState.SignedIn(user)
-                    _newDisplayName.value = user.displayName ?: "" // Profil için görünen adı ayarla
-                    _currentUserPhotoUrl.value = user.photoUrl?.toString()
-                    _eventFlow.emit("Registration successful!")
-                    // Başarılı kayıt sonrası formu temizle
-                    _email.value = ""
-                    _password.value = ""
-                    _signUpDisplayName.value = "" // Kayıt için girilen adı da temizle
+                    // _currentUser and _authState will be updated by authStateListener.
+                    Log.d("AuthViewModel", "Sign in successful: ${user.email}")
                 },
                 onFailure = { exception ->
-                    Log.e("AuthViewModel", "Sign up failed", exception)
-                    // Hata mesajını daha kullanıcı dostu yapalım
-                    _errorMessage.value = when (exception) {
-                        is FirebaseAuthUserCollisionException -> "This email address is already in use."
-                        is FirebaseAuthWeakPasswordException -> "Password is too weak. Please use a stronger password."
-                        // Diğer spesifik Firebase hataları buraya eklenebilir
-                        else -> exception.localizedMessage ?: "Registration failed. Please try again." // Genel mesaj
-                    }
-                    _authUiState.value = AuthUiState.Error(errorMessage.value!!)
+                    _authState.value = AuthState.Error(exception.message ?: "Sign in failed")
+                    Log.e("AuthViewModel", "Sign in error", exception)
                 }
             )
-            _isLoading.value = false
         }
     }
 
-    fun signIn() {
-        if (!NetworkUtils.isNetworkAvailable(getApplication())) { // AuthViewModel da AndroidViewModel olmalı
-            _errorMessage.value = "No internet connection available."
-            return
-        }
-
-        val currentEmail = _email.value.trim()
-        val currentPassword = _password.value.trim()
-
-        if (currentEmail.isBlank() || currentPassword.isBlank()) {
-            _errorMessage.value = "Please enter both email and password."
-            return
-        }
-
+    fun signUp(email: String, password: String, displayName: String) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            Log.d("AuthViewModel", "Sign in started for $currentEmail")
-
-            val result = authRepository.signIn(currentEmail, currentPassword)
+            _authState.value = AuthState.Loading
+            val result = authRepository.signUp(email, password, displayName)
             result.fold(
                 onSuccess = { user ->
-                    Log.d("AuthViewModel", "Sign in success: ${user.email}")
-                    _authUiState.value = AuthUiState.SignedIn(user)
-                    _newDisplayName.value = user.displayName ?: "" // Görünen adı yükle
-                    _currentUserPhotoUrl.value = user.photoUrl?.toString() // Profil resmi URL'sini yükle
-                    _eventFlow.emit("Login successful!")
-                    // Başarılı giriş sonrası formu temizle (isteğe bağlı)
-                    _email.value = ""
-                    _password.value = ""
+                    // _currentUser and _authState will be updated by authStateListener.
+                    Log.d("AuthViewModel", "Sign up successful: ${user.email}")
                 },
                 onFailure = { exception ->
-                    Log.e("AuthViewModel", "Sign in failed", exception)
-                    // Hata mesajını daha kullanıcı dostu yapalım
-                    _errorMessage.value = when (exception) {
-                        is FirebaseAuthInvalidUserException, is FirebaseAuthInvalidCredentialsException -> "Invalid email or password."
-                        // Diğer spesifik Firebase hataları buraya eklenebilir
-                        else -> exception.localizedMessage ?: "Login failed. Please check your credentials." // Genel mesaj
-                    }
-                    _authUiState.value = AuthUiState.Error(errorMessage.value!!)
+                    _authState.value = AuthState.Error(exception.message ?: "Sign up failed")
+                    Log.e("AuthViewModel", "Sign up error", exception)
                 }
             )
-            _isLoading.value = false
         }
     }
 
     fun signOut() {
-        Log.d("AuthViewModel", "Sign out requested")
         authRepository.signOut()
-        _authUiState.value = AuthUiState.SignedOut // UI'ı hemen güncelle
-        // Formu temizle
-        _email.value = ""
-        _password.value = ""
-        _errorMessage.value = null
-        _newDisplayName.value = ""
-        _currentUserPhotoUrl.value = null
-        _selectedImageUri.value = null
-        _signUpDisplayName.value = "" // Çıkışta kayıt için girilen adı da temizle
+        // _currentUser and _authState will be updated by authStateListener.
     }
 
-    fun sendPasswordResetEmail() {
-        if (!NetworkUtils.isNetworkAvailable(getApplication())) {
-            _errorMessage.value = "No internet connection available."
+    fun resetAuthState() {
+        _authState.value = AuthState.Idle
+    }
+
+    fun sendPasswordResetEmail(email: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val result = authRepository.sendPasswordResetEmail(email)
+            result.fold(
+                onSuccess = {
+                    _authState.value =
+                        AuthState.Idle // Or a custom state e.g., PasswordResetEmailSent.
+                    Log.d("AuthViewModel", "Password reset email sent to $email")
+                },
+                onFailure = { exception ->
+                    _authState.value =
+                        AuthState.Error(exception.message ?: "Failed to send password reset email")
+                    Log.e("AuthViewModel", "Error sending password reset email", exception)
+                }
+            )
+        }
+    }
+
+
+    // --- Favorite Route Functions ---
+
+    fun loadFavoriteRoutes() {
+        val userId = currentUser.value?.uid
+        if (userId == null) {
+            _favoriteRouteError.value = "User not logged in."
+            _favoriteRoutes.value = emptyList()
             return
         }
-        val currentEmail = _email.value.trim()
-        if (currentEmail.isBlank()) {
-            _errorMessage.value = "Please enter your email address to reset password."
+        viewModelScope.launch {
+            _isLoadingFavorites.value = true
+            _favoriteRouteError.value = null
+            Log.d("AuthViewModel", "Loading favorite routes for user: $userId")
+            val result = trafficRepository.getFavoriteRoutes(userId)
+            result.fold(
+                onSuccess = { routes ->
+                    _favoriteRoutes.value = routes
+                    Log.d("AuthViewModel", "Successfully loaded ${routes.size} favorite routes.")
+                },
+                onFailure = { exception ->
+                    _favoriteRouteError.value =
+                        "Failed to load favorite routes: ${exception.message}"
+                    Log.e("AuthViewModel", "Error loading favorite routes", exception)
+                }
+            )
+            _isLoadingFavorites.value = false
+        }
+    }
+
+    fun addFavoriteRoute(route: FavoriteRoute) { // This function takes a FavoriteRoute object directly; coordinates should already be resolved.
+        val userId = currentUser.value?.uid
+        if (userId == null) {
+            _favoriteRouteError.value = "User not logged in. Cannot add route."
+            return
+        }
+        val routeToAdd = route.copy(userId = userId) // We assign the userId here.
+        viewModelScope.launch {
+            _favoriteRouteError.value = null
+            Log.d("AuthViewModel", "Adding favorite route: ${routeToAdd.name} for user $userId")
+            val result = trafficRepository.addFavoriteRoute(userId, routeToAdd)
+            result.fold(
+                onSuccess = { routeId ->
+                    Log.d(
+                        "AuthViewModel",
+                        "Favorite route added successfully with id: $routeId. Reloading routes."
+                    )
+                    loadFavoriteRoutes() // Refresh the list.
+                },
+                onFailure = { exception ->
+                    _favoriteRouteError.value = "Failed to add favorite route: ${exception.message}"
+                    Log.e("AuthViewModel", "Error adding favorite route", exception)
+                }
+            )
+        }
+    }
+
+    fun addFavoriteRouteFromAddresses(
+        routeName: String,
+        originAddress: String,
+        destinationAddress: String
+    ) {
+        val userId = currentUser.value?.uid
+        if (userId == null) {
+            _favoriteRouteError.value = "User not logged in. Cannot add route."
+            return
+        }
+        if (routeName.isBlank() || originAddress.isBlank() || destinationAddress.isBlank()) {
+            _favoriteRouteError.value =
+                "Route name, origin, and destination addresses cannot be empty."
             return
         }
 
         viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            Log.d("AuthViewModel", "Sending password reset email to $currentEmail")
-            val result = authRepository.sendPasswordResetEmail(currentEmail)
+            _isLoadingFavorites.value = true // Start the loading indicator.
+            _favoriteRouteError.value = null
+            Log.d("AuthViewModel", "Attempting to add favorite route from addresses: $routeName")
+
+            try {
+                val originResult = trafficRepository.getCoordinatesFromAddress(originAddress)
+                val destinationResult =
+                    trafficRepository.getCoordinatesFromAddress(destinationAddress)
+
+                var originLocation: com.example.trafficprediction.network.Location? = null
+                var destinationLocation: com.example.trafficprediction.network.Location? = null
+                var errorOccurred = false
+
+                originResult.fold(
+                    onSuccess = { location -> originLocation = location },
+                    onFailure = { exception ->
+                        _favoriteRouteError.value =
+                            "Could not find coordinates for origin: ${exception.message}"
+                        Log.e(
+                            "AuthViewModel",
+                            "Error geocoding origin address: $originAddress",
+                            exception
+                        )
+                        errorOccurred = true
+                    }
+                )
+
+                if (errorOccurred) {
+                    _isLoadingFavorites.value = false
+                    return@launch
+                }
+
+                destinationResult.fold(
+                    onSuccess = { location -> destinationLocation = location },
+                    onFailure = { exception ->
+                        _favoriteRouteError.value =
+                            "Could not find coordinates for destination: ${exception.message}"
+                        Log.e(
+                            "AuthViewModel",
+                            "Error geocoding destination address: $destinationAddress",
+                            exception
+                        )
+                        errorOccurred = true
+                    }
+                )
+
+                if (errorOccurred) {
+                    _isLoadingFavorites.value = false
+                    return@launch
+                }
+
+                if (originLocation != null && destinationLocation != null) {
+                    val newRoute = originLocation!!.latitude?.let {
+                        FavoriteRoute(
+                            userId = userId, // userId should be assigned here.
+                            name = routeName,
+                            originLat = it,
+                            originLng = originLocation!!.longitude!!,
+                            originAddress = originAddress, // We store the address entered by the user.
+                            destinationLat = destinationLocation!!.latitude!!,
+                            destinationLng = destinationLocation!!.longitude!!,
+                            destinationAddress = destinationAddress // We store the address entered by the user.
+                        )
+                    }
+                    if (newRoute != null) {
+                        addFavoriteRoute(newRoute)
+                    } // Call the existing addFavoriteRoute function.
+                } else {
+                    if (_favoriteRouteError.value == null) {
+                        _favoriteRouteError.value =
+                            "Could not resolve one or both addresses to coordinates."
+                    }
+                }
+            } catch (e: Exception) {
+                _favoriteRouteError.value = "An unexpected error occurred: ${e.message}"
+                Log.e("AuthViewModel", "Unexpected error in addFavoriteRouteFromAddresses", e)
+            } finally {
+                _isLoadingFavorites.value = false // Stop the loading indicator.
+            }
+        }
+    }
+
+
+    fun deleteFavoriteRoute(routeId: String) {
+        val userId = currentUser.value?.uid
+        if (userId == null) {
+            _favoriteRouteError.value = "User not logged in. Cannot delete route."
+            return
+        }
+        viewModelScope.launch {
+            _favoriteRouteError.value = null
+            Log.d("AuthViewModel", "Deleting favorite route: $routeId for user $userId")
+            val result = trafficRepository.deleteFavoriteRoute(userId, routeId)
             result.fold(
                 onSuccess = {
-                    _eventFlow.emit("Password reset email sent to $currentEmail. Please check your inbox.")
-                    Log.d("AuthViewModel", "Password reset email sent successfully to $currentEmail")
+                    Log.d("AuthViewModel", "Favorite route deleted successfully. Reloading routes.")
+                    loadFavoriteRoutes() // Refresh the list.
                 },
                 onFailure = { exception ->
-                    _errorMessage.value = exception.localizedMessage ?: "Failed to send password reset email."
-                    Log.e("AuthViewModel", "Failed to send password reset email", exception)
+                    _favoriteRouteError.value =
+                        "Failed to delete favorite route: ${exception.message}"
+                    Log.e("AuthViewModel", "Error deleting favorite route", exception)
                 }
             )
-            _isLoading.value = false
+        }
+    }
+
+    fun clearFavoriteRouteError() {
+        _favoriteRouteError.value = null
+    }
+
+    fun updateProfile(newName: String, avatarIconName: String?) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+            val result = authRepository.updateUserProfile(newName, avatarIconName)
+            result.fold(
+                onSuccess = { updatedUser ->
+                    _currentUser.value = updatedUser // FirebaseUser updated.
+                    updatedUser.uid?.let { loadUserProfileData(it) }
+                    _authState.value = AuthState.Authenticated(updatedUser) // Update AuthState.
+                    Log.d("AuthViewModel", "Profile updated successfully for ${updatedUser.email}.")
+                },
+                onFailure = { exception ->
+                    _authState.value = AuthState.Error(exception.message ?: "Profile update failed")
+                    Log.e("AuthViewModel", "Profile update error", exception)
+                }
+            )
         }
     }
 }
